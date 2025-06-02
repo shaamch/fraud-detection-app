@@ -1,34 +1,49 @@
 import streamlit as st
-import joblib
 import numpy as np
+import pandas as pd
+import joblib
 
 # Load the model and preprocessor
 model = joblib.load("fraud_detection_xgboost.pkl")
 preprocessor = joblib.load("preprocessor.pkl")
 
-# Define your feature names (customize this list as per your model)
-FEATURE_NAMES = ['amount', 'transaction_type', 'origin_account_age', 'destination_account_age']
-
 st.title("🚨 Fraud Detection App")
-st.markdown("Enter transaction details below:")
 
-# Input fields
-user_input = []
-for feature in FEATURE_NAMES:
-    value = st.text_input(f"{feature.replace('_', ' ').title()}")
-    user_input.append(value)
+st.markdown("Enter transaction details below to predict if it’s fraudulent.")
+
+# Original features expected BEFORE preprocessing
+original_inputs = {}
+
+# Categorical dropdowns
+original_inputs['type'] = st.selectbox("Transaction Type", ["Credit", "Debit"])
+original_inputs['channel'] = st.selectbox("Transaction Channel", ["ATM", "Branch", "Online"])
+original_inputs['occupation'] = st.selectbox("User Occupation", ["Doctor", "Engineer", "Retired", "Student"])
+
+# Numeric fields
+numeric_features = [
+    'amount', 'duration', 'login_attempts', 'balance', 'account_tx_count',
+    'account_avg_amount', 'account_std_amount', 'time_since_last_tx',
+    'amount_to_balance', 'device_usage_freq', 'ip_usage_freq',
+    'merchant_risk', 'location_risk'
+]
+
+for feature in numeric_features:
+    original_inputs[feature] = st.number_input(feature.replace('_', ' ').title(), min_value=0.0)
 
 if st.button("Predict"):
     try:
-        # Prepare input
-        X_input = np.array(user_input).reshape(1, -1)
-        X_processed = preprocessor.transform(X_input)
+        # Create DataFrame with one row
+        input_df = pd.DataFrame([original_inputs])
         
-        prediction = model.predict(X_processed)[0]
-        proba = model.predict_proba(X_processed)[0][int(prediction)]
+        # Preprocess
+        X_transformed = preprocessor.transform(input_df)
+        
+        # Predict
+        prediction = model.predict(X_transformed)[0]
+        proba = model.predict_proba(X_transformed)[0][int(prediction)]
 
         label = "Fraudulent ❌" if prediction == 1 else "Legitimate ✅"
         st.success(f"Prediction: **{label}**\n\nConfidence: **{proba*100:.2f}%**")
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error during prediction: {e}")
