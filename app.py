@@ -2,6 +2,18 @@ import streamlit as st
 import joblib
 import numpy as np
 
+# Fix for scikit-learn version mismatch
+from types import SimpleNamespace
+import sklearn.compose
+
+if not hasattr(sklearn.compose._column_transformer, '_RemainderColsList'):
+    class _RemainderColsList(list):
+        __doc__ = "Marker class to remain columns"
+    sklearn.compose._column_transformer._RemainderColsList = _RemainderColsList
+
+if not hasattr(sklearn.compose._column_transformer, '_ColumnTransformer'):
+    sklearn.compose._column_transformer._ColumnTransformer = SimpleNamespace
+
 # Load the model and preprocessor
 model = joblib.load("fraud_detection_xgboost.pkl")
 preprocessor = joblib.load("preprocessor.pkl")
