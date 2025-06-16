@@ -1,69 +1,60 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import cloudpickle
 import joblib
-from datetime import datetime
 import random
+from datetime import datetime
 
 # Load model and preprocessor
 model = joblib.load("fraud_detection_xgboost.pkl")
-preprocessor = joblib.load("preprocessor.pkl")
 
-st.title("🚨 Fraud Detection App")
-st.markdown("Enter transaction details to predict fraud.")
+with open("preprocessor.pkl", "rb") as f:
+    preprocessor = cloudpickle.load(f)
 
-# ========== Input Section ==========
+st.title("🚨 Smart Fraud Detection App")
+st.markdown("Enter minimum transaction details. System will auto-fill the rest.")
 
-# Categorical inputs
-original_inputs = {
+# User inputs (only 4 inputs from user)
+user_input = {
     'type': st.selectbox("Transaction Type", ["Credit", "Debit"]),
     'channel': st.selectbox("Transaction Channel", ["ATM", "Branch", "Online"]),
     'occupation': st.selectbox("User Occupation", ["Doctor", "Engineer", "Retired", "Student"]),
+    'amount': st.number_input("Transaction Amount", min_value=0.0, value=100.0)
 }
 
-# Numeric inputs (user-filled)
-user_numeric = {
-    'amount': st.number_input("Transaction Amount", min_value=0.0),
-    'login_attempts': st.number_input("Login Attempts", min_value=0),
-    'balance': st.number_input("Account Balance", min_value=0.0),
-    'account_tx_count': st.number_input("Total Account Transactions", min_value=0),
-    'account_avg_amount': st.number_input("Average Transaction Amount", min_value=0.0),
-    'account_std_amount': st.number_input("Std Dev of Transaction Amounts", min_value=0.0),
-    'amount_to_balance': st.number_input("Amount to Balance Ratio", min_value=0.0),
-    'merchant_risk': st.slider("Merchant Risk (0–1)", 0.0, 1.0, 0.2),
-    'location_risk': st.slider("Location Risk (0–1)", 0.0, 1.0, 0.3),
+# Generate defaults or simulated values for remaining 19 features
+auto_inputs = {
+    'duration': random.uniform(1, 60),  # seconds
+    'login_attempts': random.randint(0, 5),
+    'balance': random.uniform(1000, 50000),
+    'account_tx_count': random.randint(5, 100),
+    'account_avg_amount': random.uniform(50, 5000),
+    'account_std_amount': random.uniform(10, 1000),
+    'time_since_last_tx': random.uniform(0.1, 48),  # hours
+    'amount_to_balance': user_input['amount'] / max(1, random.uniform(1000, 50000)),
+    'device_usage_freq': random.uniform(0.1, 10),  # logins/day
+    'ip_usage_freq': random.uniform(0.1, 10),
+    'merchant_risk': random.uniform(0, 1),
+    'location_risk': random.uniform(0, 1),
 }
 
-# ========== Auto Time Feature Section ==========
+# Merge inputs
+all_inputs = {**user_input, **auto_inputs}
 
-# Simulated values (or could be linked to real time logs in production)
-now = datetime.now()
-random.seed(now.microsecond)
-
-original_inputs.update(user_numeric)
-
-# Simulate time-based fields (these could also come from logs)
-original_inputs['duration'] = random.uniform(1, 60)  # e.g., seconds since login
-original_inputs['time_since_last_tx'] = random.uniform(0.5, 48)  # hours
-original_inputs['device_usage_freq'] = random.uniform(0, 10)  # logins per day
-original_inputs['ip_usage_freq'] = random.uniform(0, 10)  # logins per IP
-
-# ========== Prediction Section ==========
-
-if st.button("Predict"):
+# Predict button
+if st.button("Predict Fraud"):
     try:
-        input_df = pd.DataFrame([original_inputs])
-        
-        # Preprocess and predict
-        X_transformed = preprocessor.transform(input_df)
-        prediction = model.predict(X_transformed)[0]
-        proba = model.predict_proba(X_transformed)[0][int(prediction)]
+        input_df = pd.DataFrame([all_inputs])
+        transformed_input = preprocessor.transform(input_df)
+        prediction = model.predict(transformed_input)[0]
+        prob = model.predict_proba(transformed_input)[0][int(prediction)]
 
         label = "Fraudulent ❌" if prediction == 1 else "Legitimate ✅"
-        st.success(f"Prediction: **{label}**\nConfidence: **{proba * 100:.2f}%**")
+        st.success(f"Prediction: **{label}**\nConfidence: **{prob * 100:.2f}%**")
 
-        # Show all values used in prediction
-        with st.expander("🔍 Details of Transaction"):
+        # Expandable for debug
+        with st.expander("🔍 Inputs Used"):
             st.dataframe(input_df.T.rename(columns={0: "Value"}))
 
     except Exception as e:
