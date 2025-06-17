@@ -1,13 +1,16 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import joblib  # Only need joblib now
+import cloudpickle
+import joblib
 import random
 from datetime import datetime
 
-# Load both files with joblib
+# Load model and preprocessor
 model = joblib.load("fraud_detection_xgboost.pkl")
-preprocessor = joblib.load("preprocessor.pkl")  # Updated line
+
+with open("preprocessor.pkl", "rb") as f:
+    preprocessor = cloudpickle.load(f)
 
 st.title("🚨 Smart Fraud Detection App")
 st.markdown("Enter minimum transaction details. System will auto-fill the rest.")
@@ -20,17 +23,17 @@ user_input = {
     'amount': st.number_input("Transaction Amount", min_value=0.0, value=100.0)
 }
 
-# Generate defaults for remaining features
+# Generate defaults or simulated values for remaining 19 features
 auto_inputs = {
-    'duration': random.uniform(1, 60),
+    'duration': random.uniform(1, 60),  # seconds
     'login_attempts': random.randint(0, 5),
     'balance': random.uniform(1000, 50000),
     'account_tx_count': random.randint(5, 100),
     'account_avg_amount': random.uniform(50, 5000),
     'account_std_amount': random.uniform(10, 1000),
-    'time_since_last_tx': random.uniform(0.1, 48),
+    'time_since_last_tx': random.uniform(0.1, 48),  # hours
     'amount_to_balance': user_input['amount'] / max(1, random.uniform(1000, 50000)),
-    'device_usage_freq': random.uniform(0.1, 10),
+    'device_usage_freq': random.uniform(0.1, 10),  # logins/day
     'ip_usage_freq': random.uniform(0.1, 10),
     'merchant_risk': random.uniform(0, 1),
     'location_risk': random.uniform(0, 1),
@@ -50,6 +53,7 @@ if st.button("Predict Fraud"):
         label = "Fraudulent ❌" if prediction == 1 else "Legitimate ✅"
         st.success(f"Prediction: **{label}**\nConfidence: **{prob * 100:.2f}%**")
 
+        # Expandable for debug
         with st.expander("🔍 Inputs Used"):
             st.dataframe(input_df.T.rename(columns={0: "Value"}))
 
