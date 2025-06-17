@@ -1,12 +1,13 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import joblib  # Use joblib for both loading operations
+import joblib
 import random
+from sklearn.compose import ColumnTransformer  # Add this import
 
-# Load both files with joblib
+# Load model and preprocessor
 model = joblib.load("fraud_detection_xgboost.pkl")
-preprocessor = joblib.load("preprocessor.pkl")  # Consistent loading
+preprocessor = joblib.load("preprocessor.pkl")
 
 st.title("🚨 Smart Fraud Detection App")
 st.markdown("Enter minimum transaction details. System will auto-fill the rest.")
@@ -40,7 +41,10 @@ all_inputs = {**user_input, **auto_inputs}
 
 if st.button("Predict Fraud"):
     try:
-        input_df = pd.DataFrame([all_inputs])
+        # Ensure correct column order
+        columns_order = list(user_input.keys()) + list(auto_inputs.keys())
+        input_df = pd.DataFrame([all_inputs])[columns_order]
+        
         transformed_input = preprocessor.transform(input_df)
         prediction = model.predict(transformed_input)[0]
         prob = model.predict_proba(transformed_input)[0][int(prediction)]
@@ -53,3 +57,4 @@ if st.button("Predict Fraud"):
 
     except Exception as e:
         st.error(f"Error during prediction: {str(e)}")
+        st.error("Please check that all features are correctly defined")
