@@ -1,7 +1,7 @@
 streamlit
-numpy
 pandas
-scikit-learn
-xgboost
+numpy
+cloudpickle
 joblib
-cloudpickle  # Add this line
+xgboost
+scikit-learn
